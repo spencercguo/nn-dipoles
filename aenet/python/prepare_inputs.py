@@ -4,8 +4,8 @@ import numpy as np
 from math import *
 from collections import namedtuple
 from scipy.spatial.transform import Rotation as R
-from ase import Atoms
-from ase.io import write
+# from ase import Atoms
+# from ase.io import write
 
 def read_xyz(fin):
     """ 
@@ -111,7 +111,7 @@ def write_xsf(name, xyz, lat, dipole):
             sym = 'O'
         else:
             sym = 'H'
-        xsf += [f'{sym} {xyz[i,0]: .12f} {xyz[i,1]: .12f} {xyz[i,2]: .12f} ']
+        xsf += [f'{sym} {xyz[i,0]: .12f} {xyz[i,1]: .12f} {xyz[i,2]: .12f} 0.0 0.0 0.0']
 
     output = '\n'.join(xsf)
     with open(name, mode='w') as f:
@@ -131,17 +131,18 @@ def read_molecular_dipoles(filepath, nsteps):
 
 
 def main():
-    traj_file = sys.argv[1]
+    traj_dir = sys.argv[1]
     data_dir = sys.argv[2]
     dipole_file = sys.argv[3]
+    nframes = int(sys.argv[4])
 
-    print(f'Trajectory file: {traj_file}')
-    print(f'Output directory: {data_dir}')
+    print(f'Trajectory directory: {traj_dir}')
+    print(f'Output directory header: {data_dir}')
     print(f"Dipole file: {dipole_file}")
     print('\n')
 
-    with open(traj_file) as f:
-        xyz = read_xyz(f)[0]
+    # with open(traj_file) as f:
+    #    xyz = read_xyz(f)[0]
     
     nmol = 128
     # masses in amu for calculating COM
@@ -149,52 +150,55 @@ def main():
     # initial lattice vectors (in Angstroms)
     lat = np.array([[15.660, 0, 0], [0, 15.66, 0], [0, 0, 15.66]])
 
-    print('Reading molecular dipoles from file...')
-    dipoles = read_molecular_dipoles(dipole_file, 1)
+    print(f'Reading molecular dipoles from file for {nframes} frames...')
+    dipoles = read_molecular_dipoles(dipole_file, nframes)
     print('Finishing reading molecular dipoles\n')
     
     print('Making rotated input files...')
     # create new rotated file for each atom as center
-    for i in range(nmol):
-        start_idx = i * 3 # also the coordinates of the oxygen
-        r = com(masses, xyz[start_idx:(start_idx + 3)])
+    for f in range(nframes):
+        traj_name = f'dft_traj-{f}.xyz'
+        traj_file = os.path.join(traj_dir, traj_name)
+        with open(traj_file) as fin:
+            xyz = read_xyz(fin)[0]
 
-        # translate so center of mass of relevant molecule is at origin
-        rot_xyz = xyz - r
-        # rot_lat = lattice - r
+        for i in range(nmol):
+            start_idx = i * 3 # also the coordinates of the oxygen
+            r = com(masses, xyz[start_idx:(start_idx + 3)])
 
-        # principle axis goes through oxygen and COM
-        # rotate system first so that principle axis aligns with z-axis of box
-        R1 = np.zeros((3,3))
-        R_2vect(R1, rot_xyz[start_idx], (0, 0, 1))
-        rot_xyz = np.matmul(R1, rot_xyz.T).T
-        lat = np.matmul(R1, lat)
+            # translate so center of mass of relevant molecule is at origin
+            rot_xyz = xyz - r
+            # rot_lat = lattice - r
 
-        # secondary axis goes through hydrogens
-        # rotate projection around z-axis so O-H vectors are in xz plane
-        # angle in x-y plane
-        H_idx = start_idx + 1
-        theta = atan(rot_xyz[H_idx,1] / rot_xyz[H_idx,0])
-        # rotate about z-axis 
-        R2 = R.from_euler('z', -theta)
-        rot_xyz = R2.apply(rot_xyz)
-        rot_lat = R2.apply(lat)
+            # principle axis goes through oxygen and COM
+            # rotate system first so that principle axis aligns with z-axis of box
+            R1 = np.zeros((3,3))
+            R_2vect(R1, rot_xyz[start_idx], (0, 0, 1))
+            rot_xyz = np.matmul(R1, rot_xyz.T).T
+            lat = np.matmul(R1, lat)
 
-        # print(com(masses, rot_xyz[start_idx:(start_idx +3)]))
-        # print(rot_xyz[H_idx,1])
-        # print(rot_xyz[H_idx+1, 1])
+            # secondary axis goes through hydrogens
+            # rotate projection around z-axis so O-H vectors are in xz plane
+            # angle in x-y plane
+            H_idx = start_idx + 1
+            theta = atan(rot_xyz[H_idx,1] / rot_xyz[H_idx,0])
+            # rotate about z-axis 
+            R2 = R.from_euler('z', -theta)
+            rot_xyz = R2.apply(rot_xyz)
+            rot_lat = R2.apply(lat)
+            
+            # get dipole for molecule i and frame, then rotate
+            dipole = dipoles[i, :, f]
+            dipole = np.matmul(R1, dipole)
+            dipole = R2.apply(dipole)
 
-        # write rotated xyz to new file for training use
-        # atoms = Atoms(symbols=['O','H','H']*nmol, positions=rot_xyz, cell=rot_lat)
-        name = f'input_0_{i}.xsf'
-        full_dir = os.path.abspath(data_dir)
-        name = os.path.join(full_dir, name)
-        # write(name, atoms, format='xsf')
+            # write rotated xyz to new file for training use
+            name = f'input_{f}_{i}.xsf'
+            for j, direction in enumerate(('x', 'y', 'z')):
+                full_dir = f'{os.path.abspath(data_dir)}-{direction}'
+                full_name = os.path.join(full_dir, name)
+                write_xsf(full_name, rot_xyz, rot_lat, dipole[j])
         
-        # just use x direction for now
-        dipole = dipoles[i, 0, 0]
-        write_xsf(name, rot_xyz, rot_lat, dipole)
-    
     print('Finished.')
 
 if __name__ == "__main__":
