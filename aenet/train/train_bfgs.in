@@ -1,0 +1,14 @@
+TRAININGSET water.train
+TESTPERCENT 10
+ITERATIONS  2500
+
+TIMING
+
+METHOD
+bfgs
+
+NETWORKS
+! atom   network         hidden
+! types  file-name       layers  nodes:activation
+  O       O.25t-25t.ann   2    25:tanh 25:tanh
+  H       H.25t-25t.ann   2    25:tanh 25:tanh

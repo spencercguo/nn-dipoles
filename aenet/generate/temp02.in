@@ -1,0 +1,14 @@
+OUTPUT water.train
+
+TIMING
+
+TYPES
+2
+O 0.0  ! eV
+H 0.0  ! eV
+
+SETUPS
+O   O.fingerprint.stp
+H   H.fingerprint.stp
+
+FILES
