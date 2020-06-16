@@ -173,7 +173,7 @@ def main():
             R1 = np.zeros((3,3))
             R_2vect(R1, rot_xyz[start_idx], (0, 0, 1))
             rot_xyz = np.matmul(R1, rot_xyz.T).T
-            lat = np.matmul(R1, lat)
+            # lat = np.matmul(R1, lat)
 
             # secondary axis goes through hydrogens
             # rotate projection around z-axis so O-H vectors are in xz plane
@@ -183,7 +183,8 @@ def main():
             # rotate about z-axis 
             R2 = R.from_euler('z', -theta)
             rot_xyz = R2.apply(rot_xyz)
-            rot_lat = R2.apply(lat)
+            # rot_lat = R2.apply(lat)
+            rot_lat = lat
             
             # get dipole for molecule i and frame, then rotate
             dipole = dipoles[i, :, f]
