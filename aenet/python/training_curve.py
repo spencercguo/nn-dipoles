@@ -27,14 +27,12 @@ if not (sys.argv[3] == 'True'):
     plt.plot(test_rmse)
     plt.xlabel('Epoch')
     plt.ylabel('Test RMSE, y-component')
-    plt.ylim([0.0015, 0.003])
-    print(max(test_rmse))
-    print(min(test_rmse))
+    plt.ylim([min(test_rmse) - 0.005, max(test_rmse)])
     plt.savefig(f'{outfile}', dpi=200)
 else:
     plt.plot(train_rmse)
     plt.xlabel('Epoch')
     plt.ylabel(f'Train RMSE, {axis}')
-    plt.ylim([0.004, 0.0045])
+    plt.ylim([min(train_rmse) - 0.005, max(train_rmse)])
     plt.savefig(f'{outfile}', dpi=200)
 
